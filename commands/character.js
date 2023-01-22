@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { SlashCommandBuilder } = require('discord.js');
 const { Configuration, OpenAIApi } = require("openai");
+const StaticUtils = require('../utilities/static.js');
 
 module.exports = {
 	data: new SlashCommandBuilder()
@@ -10,46 +11,35 @@ module.exports = {
         .addIntegerOption(option => option.setName('level').setDescription('1,2,3...'))
 		.setDescription('Generate a character through AI. All parameters are optional and random by default.'),
 	async execute(interaction) {
-        interaction.reply(`Generating...`);
+        await interaction.reply(`Generating...`);
 
-        const configuration = new Configuration({apiKey: process.env.OPENAI_API_KEY});
-        const openai = new OpenAIApi(configuration);
-        const character = {
-            race: interaction.options.getString('race') ?? getRandomRace(),
-            class: interaction.options.getString('class') ?? getRandomClass(),
-            level: interaction.options.getInteger('level') ?? getRandomNumber(1, 10)
+        const openaiIsConfigured = await StaticUtils.OpenAI.IsConfigured();
+        if(!openaiIsConfigured) {
+            await interaction.editReply(`You need to provide a valid OpenAI Key to use this feature.\nUse /settings openai <key> or check out /help for more info.`);
+            return;
         }
-        const format = process.env.GPT3_CHARACTER_PROMPT.replace("{class}", character.class).replace("{level}", character.level);
+
+        const openaiKey = await StaticUtils.OpenAI.GetKey();
+        const openaiConfiguration = new Configuration({apiKey: openaiKey});
+        const openai = new OpenAIApi(openaiConfiguration);
+
+        const character = {
+            race: interaction.options.getString('race') ?? StaticUtils.RPG.Races.random(),
+            class: interaction.options.getString('class') ?? StaticUtils.RPG.Classes.random(),
+            level: interaction.options.getInteger('level') ?? StaticUtils.RPG.Levels.random()
+        }
+
+        const format = process.env.GPT3_PREFIX_PROMPT + process.env.GPT3_CHARACTER_PROMPT.replace("{class}", character.class).replace("{level}", character.level);
 
         const gptResponse = await openai.createCompletion({
             model: "text-davinci-003",
             prompt: format,
-            max_tokens: 170,
+            max_tokens: 256,
             temperature: 0.7,
             top_p: 0.3,
             presence_penalty: 0,
             frequency_penalty: 0.5,
         });
-        interaction.editReply(`${gptResponse.data.choices[0].text}`);
+        await interaction.editReply(`${gptResponse.data.choices[0].text}`);
 	},
 };
-
-function getRandomClass() {
-    const classes = ['Barbarian', 'Bard', 'Cleric', 'Druid', 'Fighter', 'Monk', 'Paladin', 'Ranger', 'Rogue', 'Sorcerer', 'Warlock', 'Wizard'];
-    return getRandomFromList(classes);
-}
-
-function getRandomRace() {
-    const races = ['Dwarf', 'Elf', 'Gnome', 'Galf-Elf', 'Halfling', 'Half-Orc', 'Human'];
-    return getRandomFromList(races);
-}
-
-function getRandomFromList(list) {
-    return Math.floor(Math.random() * list.length);
-}
-
-function getRandomNumber(min, max) {
-    min = Math.ceil(min);
-    max = Math.floor(max);
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
