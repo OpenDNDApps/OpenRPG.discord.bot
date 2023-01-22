@@ -4,14 +4,14 @@ module.exports = {
 	data: new SlashCommandBuilder()
 		.setName('roll')
         .addStringOption(option => option.setRequired(true).setName('roll').setDescription('ex. 2d6+1 or 1d20'))
-		.setDescription('ex. 2d6+1 or 1d20'),
+		.setDescription('Roll dices ex. 2d6+1 or 1d20'),
 	async execute(interaction) {
         const diceRoller = new DiceRoller();
-        const param = interaction.options.getString('roll');
-        const parsedInput = diceRoller.parse(param);
-        const roll = diceRoller.rollParsed(parsedInput);
         const renderer = new DiscordRollRenderer();
-        const render = renderer.render(roll);
-		await interaction.reply(`### 🎲 ${param} : \n ## ${render}`);
+
+        const param = interaction.options.getString('roll');
+        const roll = diceRoller.rollParsed(diceRoller.parse(param));
+
+		await interaction.reply(`\`\`\`\n${param}: \n---\n## ${renderer.render(roll)} \n\`\`\` 🎲 **${roll.value.toString()}**`);
 	},
 };
